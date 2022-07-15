@@ -1,4 +1,4 @@
-import { App, Modal, Plugin, TFile, getAllTags, CachedMetadata, MarkdownRenderer, KeymapEventListener } from 'obsidian';
+import { App, Modal, Plugin, TFile, getAllTags, CachedMetadata, MarkdownRenderer } from 'obsidian';
 import { Tag } from './tag'
 import { createLink } from './utils/links'
 
@@ -11,6 +11,10 @@ export default class TaggedDocumentsViewer extends Plugin {
 	async onload() {
 		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
 			this.handleClick(evt.target as HTMLElement);
+		});
+
+		this.addRibbonIcon('hashtag', 'Tagged Documents Viewer', (evt: MouseEvent) => {
+			new TaggedDocumentsModal(this.app, '').open()
 		});
 	}
 
@@ -87,16 +91,19 @@ class TaggedDocumentsModal extends Modal {
 		return ul
 	}
 
+	async makeListItems() {
+		const list = document.querySelector('[data-tageed-documents-viewer-list]') as HTMLElement
+		list.innerHTML = ''
+		this.querying = true
+		list.appendChild(await this.getListContents())
+		this.querying = false
+	}
+
 	async tagQuerySubmitLister() {
 		if (this.querying) return
 		const inputEl = document.querySelector('[data-tag-names]') as HTMLInputElement
 		this.tag = inputEl.value
-		const list = document.querySelector('[data-tageed-documents-viewer-list]') as HTMLElement
-		list.innerHTML = ''
-		this.querying = true
-		const listContents = await this.getListContents()
-		this.querying = false
-		list.appendChild(listContents)
+		await this.makeListItems()
 	}
 
 	tagQueryKeyListener(event: KeyboardEvent) {
@@ -105,33 +112,67 @@ class TaggedDocumentsModal extends Modal {
 		}
 	}
 
-	async onOpen() {
-		const {contentEl} = this;
-		contentEl.empty()
+	renderContainer() {
 		const container = document.createElement('div')
 		container.addClass('tagged-documents-viewer-container')
-		const form = document.createElement('div')
-		form.addClass('tagged-documents-viewer-form')
+
+		return container
+	}
+
+	renderInput() {
 		const input = document.createElement('input')
 		this.input = input
 		input.value = this.tag
 		input.setAttribute('data-tag-names', '')
+		input.addEventListener('keypress', this.tagQueryKeyListener.bind(this))
+
+		return input
+	}
+
+	renderButton() {
 		const button = document.createElement('button')
 		this.button = button
 		button.innerText = 'OK'
 		button.addEventListener('click', this.tagQuerySubmitLister.bind(this))
-		input.addEventListener('keypress', this.tagQueryKeyListener.bind(this))
+		
+		return button
+	}
 
+	renderForm() {
+		const form = document.createElement('div')
+		form.addClass('tagged-documents-viewer-form')
+		const input = this.renderInput()
+		const button = this.renderButton()
+		form.appendChild(input)
+		form.appendChild(button)
+
+		return form
+	}
+
+	async renderList() {
 		const list = document.createElement('div')
 		list.setAttribute('data-tageed-documents-viewer-list', '')
 		list.addClass('tagged-documents-viewer-list-container')
-		container.appendChild(form)
-		form.appendChild(input)
-		form.appendChild(button)
-		container.appendChild(list)
 		const listContents = await this.getListContents()
 		list.appendChild(listContents)
-		contentEl.appendChild(container);
+		return list
+	}
+
+	async renderLayout() {
+		const {contentEl} = this;
+		contentEl.empty()
+		const container = this.renderContainer()
+		const form = this.renderForm()
+		const list = await this.renderList()
+		container.appendChild(form)
+		container.appendChild(list)
+		contentEl.appendChild(container)
+
+		return list
+	}
+
+	async onOpen() {
+		const list = await this.renderLayout()
 	}
 
 	onClose() {
