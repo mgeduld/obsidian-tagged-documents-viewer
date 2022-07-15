@@ -1,137 +1,172 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Modal, Plugin, TFile, getAllTags, CachedMetadata, MarkdownRenderer, KeymapEventListener } from 'obsidian';
+import { Tag } from './tag'
+import { createLink } from './utils/links'
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+type FileInfo = {
+	file: TFile, 
+	text: string
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+export default class TaggedDocumentsViewer extends Plugin {
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+			this.handleClick(evt.target as HTMLElement);
 		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	onunload() {
+	onunload() {}
 
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
+	private async handleClick(target: HTMLElement) {
+		if (!Tag.isTagNode(target)) return
+		const tag = target.innerText
+		new TaggedDocumentsModal(this.app, tag).open()
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+class TaggedDocumentsModal extends Modal {
+	contents: FileInfo[] = []
+	tag: string = ''
+	button: HTMLElement
+	input: HTMLElement
+	buttonListener: number
+	querying = false
+
+	constructor(app: App, tag: string) {
+		super(app)
+		this.tag = tag
+		this.contents = []
 	}
 
-	onOpen() {
+	getTaglists() : [string[], string[]] {
+		const tags = this.tag.split(' ')
+		const include = tags.filter(tag => tag.charAt(0) !== '!')
+		const exclude = tags.filter(tag => tag.charAt(0) === '!').map(tag => tag.substring(1))
+
+		return [include, exclude]
+	}
+
+	getFilesFromTag(tags: string[]): TFile[] {
+		return tags.reduce((accumulator, tag) => {
+			return  [...accumulator, ...Array.from(getAllFilesMatchingTag(this.app, tag) || [])]
+		}, [])
+	}
+
+	getFiles() : TFile[] {
+		const [tagsToInclude, tagsToExclude] = this.getTaglists()
+		const startingFiles: TFile[] = this.getFilesFromTag(tagsToInclude)
+		const filesToExclude: string[] = this.getFilesFromTag(tagsToExclude).map(file => file.path)
+		return startingFiles.filter(file => !filesToExclude.includes(file.path))
+	}
+
+	async getPages(): Promise<FileInfo[]> {
+		const files: TFile[] = this.getFiles()
+		const numFiles = files.length
+		const contents: FileInfo[] = []
+		for (let i = 0; i < numFiles; i++) {
+			const file = files[i]
+			contents.push({file, text: await this.app.vault.cachedRead(file)})
+		}
+		return contents
+	}
+
+	async getListContents() {
+		const contents: FileInfo[] = await this.getPages()
+		const ul = document.createElement('ul')
+		contents.forEach(async ({file, text}) => {
+			const li = ul.createEl('li')
+			const title = document.createElement('h3')
+			const link = createLink(this.app, file, () => this.close())
+			const content = document.createElement('div')
+			// @ts-ignore
+			await MarkdownRenderer.renderMarkdown(text, content, file.path)
+			li.appendChild(title)
+			title.appendChild(link)
+			li.appendChild(content)
+		})
+
+		return ul
+	}
+
+	async tagQuerySubmitLister() {
+		if (this.querying) return
+		const inputEl = document.querySelector('[data-tag-names]') as HTMLInputElement
+		this.tag = inputEl.value
+		const list = document.querySelector('[data-tageed-documents-viewer-list]') as HTMLElement
+		list.innerHTML = ''
+		this.querying = true
+		const listContents = await this.getListContents()
+		this.querying = false
+		list.appendChild(listContents)
+	}
+
+	tagQueryKeyListener(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			this.tagQuerySubmitLister()
+		}
+	}
+
+	async onOpen() {
 		const {contentEl} = this;
-		contentEl.setText('Woah!');
+		contentEl.empty()
+		const container = document.createElement('div')
+		container.addClass('tagged-documents-viewer-container')
+		const form = document.createElement('div')
+		form.addClass('tagged-documents-viewer-form')
+		const input = document.createElement('input')
+		this.input = input
+		input.value = this.tag
+		input.setAttribute('data-tag-names', '')
+		const button = document.createElement('button')
+		this.button = button
+		button.innerText = 'OK'
+		button.addEventListener('click', this.tagQuerySubmitLister.bind(this))
+		input.addEventListener('keypress', this.tagQueryKeyListener.bind(this))
+
+		const list = document.createElement('div')
+		list.setAttribute('data-tageed-documents-viewer-list', '')
+		list.addClass('tagged-documents-viewer-list-container')
+		container.appendChild(form)
+		form.appendChild(input)
+		form.appendChild(button)
+		container.appendChild(list)
+		const listContents = await this.getListContents()
+		list.appendChild(listContents)
+		contentEl.appendChild(container);
 	}
 
 	onClose() {
 		const {contentEl} = this;
 		contentEl.empty();
+		this.button.removeEventListener('click', this.tagQuerySubmitLister)
+		this.input.removeEventListener('keydown', this.tagQueryKeyListener)
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+function hasTag(tags: string[], value: string): boolean {
+	if (!tags.length || !Array.isArray(tags)) return false;
+	return tags.some((v) => v.toLocaleLowerCase() === value.toLocaleLowerCase());
 }
+
+/**
+ * Returns a Set of files that contain a given tag
+ * 
+ * adapted from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/find-tags.ts
+ * 
+ * @param app - Obsidian app object
+ * @param tag - Tag to find
+ * @returns
+ */
+ function getAllFilesMatchingTag(app: App, tag: string): Set<TFile> {
+	const files = app.vault.getMarkdownFiles();
+	const result: Set<TFile> = new Set();
+	for (let file of files) {
+	  const tags = getAllTags(app.metadataCache.getCache(file.path) as CachedMetadata) || [];
+	  if (hasTag(tags, `#${tag}`)) {
+		result.add(file);
+	  }
+	}
+  
+	return result;
+  }
+
+
