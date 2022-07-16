@@ -1,4 +1,4 @@
-//from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/render.ts
+//adapted from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/render.ts
 import { App, OpenViewState, TFile } from "obsidian";
 
 /**
@@ -6,7 +6,10 @@ import { App, OpenViewState, TFile } from "obsidian";
  * @returns
  */
 function isMacOS(): boolean {
-  return navigator.platform.startsWith("Mac");
+  // @ts-ignore -- navigator.platform is deprecated in some browsers
+  const platform = navigator?.userAgentData?.platform || navigator?.platform
+  // on Macs, platform might be "MacIntel" or "macOS"
+  return platform.toLowerCase().startsWith("mac")
 }
 
 /**

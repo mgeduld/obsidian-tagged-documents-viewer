@@ -1,5 +1,14 @@
-import { App, Modal, Plugin, TFile, getAllTags, CachedMetadata, MarkdownRenderer } from 'obsidian';
-import { Tag } from './tag'
+import { 
+	App, 
+	Modal, 
+	Plugin, 
+	TFile, 
+	getAllTags, 
+	CachedMetadata, 
+	MarkdownRenderer,
+	Setting, 
+	PluginSettingTab, 
+	ToggleComponent} from 'obsidian'
 import { createLink } from './utils/links'
 
 type FileInfo = {
@@ -7,21 +16,110 @@ type FileInfo = {
 	text: string
 }
 
-export default class TaggedDocumentsViewer extends Plugin {
-	async onload() {
-		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-			this.handleClick(evt.target as HTMLElement);
-		});
+interface PluginSettings {
+	displayRibbonIcon: boolean;
+	openModalOnClick: boolean;
+	requireOptionKey: boolean;
+}
 
-		this.addRibbonIcon('hashtag', 'Tagged Documents Viewer', (evt: MouseEvent) => {
-			new TaggedDocumentsModal(this.app, '').open()
-		});
+const DEFAULT_SETTINGS: Partial<PluginSettings> = {
+	displayRibbonIcon: true,
+	openModalOnClick: true,
+	requireOptionKey: false
+};
+
+export class SettingsTab extends PluginSettingTab {
+	plugin: TaggedDocumentsViewer;
+  
+	constructor(app: App, plugin: TaggedDocumentsViewer) {
+	  super(app, plugin);
+	  this.plugin = plugin;
+	}
+  
+	display(): void {
+	  let { containerEl } = this;
+  
+	  containerEl.empty();
+  
+	  new Setting(containerEl)
+		.setName("Display Ribbon Icon")
+		.setDesc("Display a ribbon icon which will open the modal when clicked.")
+		.addToggle((component: ToggleComponent) => {
+			component
+				.setValue(this.plugin.settings.displayRibbonIcon)
+				.onChange(async (value) => {
+					this.plugin.settings.displayRibbonIcon = value;
+					await this.plugin.saveSettings();
+				})
+		})
+
+	 new Setting(containerEl)
+		.setName("Open Modal On Click")
+		.setDesc("Open the model when a tag is clicked.")
+		.addToggle((component: ToggleComponent) => {
+			component
+				.setValue(this.plugin.settings.openModalOnClick)
+				.onChange(async (value) => {
+					this.plugin.settings.openModalOnClick = value;
+					await this.plugin.saveSettings();
+				})
+		})
+
+	 new Setting(containerEl)
+		.setName("Require Alt/Option Key")
+		.setDesc("Require the alt/option key to be down when clicking a tag.")
+		.addToggle((component: ToggleComponent) => {
+			component
+				.setValue(this.plugin.settings.requireOptionKey)
+				.onChange(async (value) => {
+					this.plugin.settings.requireOptionKey = value;
+					await this.plugin.saveSettings();
+				})
+		})
+	}
+  }
+
+export default class TaggedDocumentsViewer extends Plugin {
+	settings: PluginSettings;
+
+	async onload() {
+		await this.loadSettings()
+
+    	this.addSettingTab(new SettingsTab(this.app, this));
+		
+		if (this.settings.openModalOnClick) {
+			this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+				if (this.settings.requireOptionKey && !evt.altKey) return
+				this.handleClick(evt.target as HTMLElement)
+			})
+		}
+
+		if (this.settings.displayRibbonIcon) {
+			this.addRibbonIcon('hashtag', 'Tagged Documents Viewer', (evt: MouseEvent) => {
+				new TaggedDocumentsModal(this.app, '').open()
+			})
+		}
 	}
 
 	onunload() {}
 
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+
+	isTagNode(target: HTMLElement): boolean {
+		return (
+			target.classList.contains("tag") ||
+			target.classList.contains("cm-hashtag")
+		)
+	}
+
 	private async handleClick(target: HTMLElement) {
-		if (!Tag.isTagNode(target)) return
+		if (!this.isTagNode(target)) return
 		const tag = target.innerText
 		new TaggedDocumentsModal(this.app, tag).open()
 	}
@@ -49,9 +147,28 @@ class TaggedDocumentsModal extends Modal {
 		return [include, exclude]
 	}
 
+	hasTag(tags: string[], value: string): boolean {
+		if (!tags.length || !Array.isArray(tags)) return false
+		return tags.some((v) => v.toLocaleLowerCase() === value.toLocaleLowerCase())
+	}
+
+	// adapted from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/find-tags.ts
+	getAllFilesMatchingTag(app: App, tag: string): Set<TFile> {
+		const files = app.vault.getMarkdownFiles()
+		const result: Set<TFile> = new Set()
+		for (let file of files) {
+		  const tags = getAllTags(app.metadataCache.getCache(file.path) as CachedMetadata) || []
+		  if (this.hasTag(tags, `#${tag}`)) {
+			result.add(file)
+		  }
+		}
+	  
+		return result
+	}
+
 	getFilesFromTag(tags: string[]): TFile[] {
 		return tags.reduce((accumulator, tag) => {
-			return  [...accumulator, ...Array.from(getAllFilesMatchingTag(this.app, tag) || [])]
+			return  [...accumulator, ...Array.from(this.getAllFilesMatchingTag(this.app, tag) || [])]
 		}, [])
 	}
 
@@ -142,6 +259,7 @@ class TaggedDocumentsModal extends Modal {
 		const form = document.createElement('div')
 		form.addClass('tagged-documents-viewer-form')
 		const input = this.renderInput()
+		input.setAttribute('placeholder', 'tag-1 tag-2 !not-tag-3')
 		const button = this.renderButton()
 		form.appendChild(input)
 		form.appendChild(button)
@@ -159,7 +277,7 @@ class TaggedDocumentsModal extends Modal {
 	}
 
 	async renderLayout() {
-		const {contentEl} = this;
+		const {contentEl} = this
 		contentEl.empty()
 		const container = this.renderContainer()
 		const form = this.renderForm()
@@ -176,38 +294,9 @@ class TaggedDocumentsModal extends Modal {
 	}
 
 	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+		const {contentEl} = this
+		contentEl.empty()
 		this.button.removeEventListener('click', this.tagQuerySubmitLister)
 		this.input.removeEventListener('keydown', this.tagQueryKeyListener)
 	}
 }
-
-function hasTag(tags: string[], value: string): boolean {
-	if (!tags.length || !Array.isArray(tags)) return false;
-	return tags.some((v) => v.toLocaleLowerCase() === value.toLocaleLowerCase());
-}
-
-/**
- * Returns a Set of files that contain a given tag
- * 
- * adapted from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/find-tags.ts
- * 
- * @param app - Obsidian app object
- * @param tag - Tag to find
- * @returns
- */
- function getAllFilesMatchingTag(app: App, tag: string): Set<TFile> {
-	const files = app.vault.getMarkdownFiles();
-	const result: Set<TFile> = new Set();
-	for (let file of files) {
-	  const tags = getAllTags(app.metadataCache.getCache(file.path) as CachedMetadata) || [];
-	  if (hasTag(tags, `#${tag}`)) {
-		result.add(file);
-	  }
-	}
-  
-	return result;
-  }
-
-
