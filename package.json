@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-tagged-documents-viewer",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "View documents with specific tags in a single scrollable modal.",
 	"main": "main.js",
 	"scripts": {

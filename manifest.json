@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-plugin-tagged-documents-viewer",
 	"name": "Tagged Documents Viewer",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "0.12.0",
 	"description": "Opens a modal with scrollable content of all documents that contain a specific tag or tags.",
 	"author": "Marcus Geduld",
