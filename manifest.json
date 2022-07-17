@@ -3,7 +3,7 @@
 	"name": "Tagged Documents Viewer",
 	"version": "1.0.1",
 	"minAppVersion": "0.12.0",
-	"description": "View documents with specific tags in a single scrollable text",
+	"description": "View documents with specific tags in a single scrollable modal.",
 	"author": "Marcus Geduld",
 	"authorUrl": "https://github.com/mgeduld/obsidian-tagged-documents-viewer",
 	"isDesktopOnly": false

@@ -16,6 +16,12 @@ type FileInfo = {
 	text: string
 }
 
+enum Settings {
+	DisplayRibbonIcon,
+	OpenModalOnClick,
+	RequireOptionKey
+}
+
 interface PluginSettings {
 	displayRibbonIcon: boolean;
 	openModalOnClick: boolean;
@@ -49,6 +55,7 @@ export class SettingsTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.displayRibbonIcon)
 				.onChange(async (value) => {
 					this.plugin.settings.displayRibbonIcon = value;
+					this.plugin.onSettingChange(Settings.DisplayRibbonIcon, value)
 					await this.plugin.saveSettings();
 				})
 		})
@@ -61,6 +68,7 @@ export class SettingsTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.openModalOnClick)
 				.onChange(async (value) => {
 					this.plugin.settings.openModalOnClick = value;
+					this.plugin.onSettingChange(Settings.OpenModalOnClick, value)
 					await this.plugin.saveSettings();
 				})
 		})
@@ -73,6 +81,7 @@ export class SettingsTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.requireOptionKey)
 				.onChange(async (value) => {
 					this.plugin.settings.requireOptionKey = value;
+					this.plugin.onSettingChange(Settings.RequireOptionKey, value)
 					await this.plugin.saveSettings();
 				})
 		})
@@ -80,28 +89,56 @@ export class SettingsTab extends PluginSettingTab {
   }
 
 export default class TaggedDocumentsViewer extends Plugin {
-	settings: PluginSettings;
+	settings: PluginSettings
+	openModalOnClick: boolean = true
+	requireOptionKey: boolean = false
+	ribbonIcon: HTMLElement
 
 	async onload() {
 		await this.loadSettings()
+		this.openModalOnClick = this.settings.openModalOnClick
+		this.requireOptionKey = this.settings.requireOptionKey
 
     	this.addSettingTab(new SettingsTab(this.app, this));
 		
-		if (this.settings.openModalOnClick) {
-			this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-				if (this.settings.requireOptionKey && !evt.altKey) return
-				this.handleClick(evt.target as HTMLElement)
-			})
-		}
+		
+		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+			if (!this.openModalOnClick) return;
+			if (this.requireOptionKey && !evt.altKey) return
+			this.handleClick(evt.target as HTMLElement)
+		})
 
 		if (this.settings.displayRibbonIcon) {
-			this.addRibbonIcon('hashtag', 'Tagged Documents Viewer', (evt: MouseEvent) => {
-				new TaggedDocumentsModal(this.app, '').open()
-			})
+			this.showRibbonIcon()
 		}
 	}
 
 	onunload() {}
+
+	showRibbonIcon() {
+		this.ribbonIcon = this.addRibbonIcon('hashtag', 'Tagged Documents Viewer', (evt: MouseEvent) => {
+			new TaggedDocumentsModal(this.app, '').open()
+		})
+	}
+
+	hideRibbonIcon() {
+		this.ribbonIcon.remove()
+	}
+
+	onSettingChange(setting: Settings, value: boolean) {
+			switch (setting) {
+				case Settings.DisplayRibbonIcon:
+					if (value) this.showRibbonIcon()
+					else this.hideRibbonIcon()
+					return;
+				case Settings.OpenModalOnClick:
+					this.openModalOnClick = value
+					return;
+				case Settings.RequireOptionKey:
+					this.requireOptionKey = value
+					return;
+			}
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
