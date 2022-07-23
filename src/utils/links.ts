@@ -7,7 +7,7 @@ import { App, OpenViewState, TFile, Platform } from "obsidian";
  * @returns
  */
 function isMetaKey(event: MouseEvent): boolean {
-  return Platform.isMacOS ? event.metaKey : event.ctrlKey;
+	return Platform.isMacOS ? event.metaKey : event.ctrlKey;
 }
 /**
  * Open an Obsidian link
@@ -17,15 +17,21 @@ function isMetaKey(event: MouseEvent): boolean {
  * @param event - Click event
  */
 async function openLink(
-  app: App,
-  dest: string,
-  currFile: TFile,
-  event: MouseEvent
+	app: App,
+	dest: string,
+	currFile: TFile,
+	event: MouseEvent
 ): Promise<void> {
-  const destFile = app.metadataCache.getFirstLinkpathDest(dest, currFile.path);
-  const mode = (app.vault as any).getConfig("defaultViewMode");
-  const leaf = app.workspace.getLeaf(isMetaKey(event));
-  await leaf.openFile(destFile as TFile, { active: true, mode} as OpenViewState);
+	const destFile = app.metadataCache.getFirstLinkpathDest(
+		dest,
+		currFile.path
+	);
+	const mode = (app.vault as any).getConfig("defaultViewMode");
+	const leaf = app.workspace.getLeaf(isMetaKey(event));
+	await leaf.openFile(
+		destFile as TFile,
+		{ active: true, mode } as OpenViewState
+	);
 }
 /**
  * Create a native-ish obsidian link
@@ -35,22 +41,22 @@ async function openLink(
  * @returns
  */
 export function createLink(
-  app: App,
-  file: TFile,
-  onClick?: (e: MouseEvent) => void
+	app: App,
+	file: TFile,
+	onClick?: (e: MouseEvent) => void
 ): HTMLAnchorElement {
-  const link = createTextContent("a", file.basename);
-  link.style.cursor = "pointer";
-  link.dataset.href = file.path;
-  link.classList.add("internal-link");
-  link.onclick = (e: MouseEvent) => {
-    openLink(app, file.path, file, e);
+	const link = createTextContent("a", file.basename);
+	link.style.cursor = "pointer";
+	link.dataset.href = file.path;
+	link.classList.add("internal-link");
+	link.onclick = (e: MouseEvent) => {
+		openLink(app, file.path, file, e);
 
-    if (typeof onClick === "function") {
-      onClick(e);
-    }
-  };
-  return link;
+		if (typeof onClick === "function") {
+			onClick(e);
+		}
+	};
+	return link;
 }
 
 /**
@@ -60,10 +66,10 @@ export function createLink(
  * @returns
  */
 export function createTextContent<K extends keyof HTMLElementTagNameMap>(
-  element: K,
-  content: string
+	element: K,
+	content: string
 ): HTMLElementTagNameMap[K] {
-  const el = document.createElement(element);
-  el.setText(content);
-  return el;
+	const el = document.createElement(element);
+	el.setText(content);
+	return el;
 }

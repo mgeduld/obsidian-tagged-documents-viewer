@@ -1,6 +1,5 @@
-import 	{ App, Setting, PluginSettingTab, ToggleComponent, } from "obsidian"
+import { App, Setting, PluginSettingTab, ToggleComponent } from "obsidian";
 import TaggedDocumentsViewer from "./TaggedDocumentsViewer";
-
 
 export enum Settings {
 	DisplayRibbonIcon,

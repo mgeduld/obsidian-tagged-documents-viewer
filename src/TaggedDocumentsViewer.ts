@@ -1,5 +1,9 @@
 import { Plugin } from "obsidian";
-import SettingsTab, {DEFAULT_SETTINGS, PluginSettings, Settings} from "./SettingsTab";
+import SettingsTab, {
+	DEFAULT_SETTINGS,
+	PluginSettings,
+	Settings,
+} from "./SettingsTab";
 import TaggedDocumentsModal from "./TaggedDocumentsModal";
 
 export default class TaggedDocumentsViewer extends Plugin {
@@ -82,5 +86,3 @@ export default class TaggedDocumentsViewer extends Plugin {
 		new TaggedDocumentsModal(this, this.app, tag).open();
 	}
 }
-
-

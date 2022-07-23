@@ -1,46 +1,55 @@
-import {
-	App,
-	Modal,
-	TFile,
-	MarkdownRenderer,
-} from "obsidian";
+import { App, Modal, TFile, MarkdownRenderer } from "obsidian";
 import PaginationControls from "./PaginationControls";
 import { createLink } from "./utils/links";
 import { getTagFiles } from "./utils/tags";
 import { FileInfo, getDocuments } from "./utils/documents";
 import TaggedDocumentsViewer from "./TaggedDocumentsViewer";
+import { MAX_DOCS_PER_PAGE } from "./utils/constants";
 
 export default class TaggedDocumentsModal extends Modal {
 	contents: FileInfo[] = [];
 	button: HTMLElement;
 	input: HTMLElement;
-    topPaginationControls: PaginationControls;
-    bottomPaginationControls: PaginationControls;
+	topPaginationControls: PaginationControls;
+	bottomPaginationControls: PaginationControls;
 	topPaginationControlsContainer: HTMLElement;
-    bottomPaginationControlsContainer: HTMLElement;
+	bottomPaginationControlsContainer: HTMLElement;
 	listContainer: HTMLElement;
 	buttonListener: number;
 	querying = false;
 	filesWithTags: TFile[] = [];
-    currentPage = 0;
-	boundPaginationListener: EventListener
+	currentPage = 0;
+	boundPaginationListener: EventListener;
 
-	constructor(private plugin: TaggedDocumentsViewer, public app: App, private tag: string) {
+	constructor(
+		private plugin: TaggedDocumentsViewer,
+		public app: App,
+		private tag: string
+	) {
 		super(app);
 		this.tag = tag;
 		this.contents = [];
 	}
 
-    async getListContents() {
-		const contents: FileInfo[] = await getDocuments(this.filesWithTags, this.currentPage, this.app.vault.cachedRead);
+	async getListContents() {
+		const contents: FileInfo[] = await getDocuments(
+			this.filesWithTags,
+			this.currentPage,
+			this.app.vault.cachedRead
+		);
 		const ul = this.containerEl.createEl("ul");
 		contents.forEach(async ({ file, text }) => {
 			const li = ul.createEl("li");
 			const title = this.containerEl.createEl("h3");
 			const link = createLink(this.app, file, () => this.close());
 			const content = this.containerEl.createEl("div");
-			// @ts-ignore
-			await MarkdownRenderer.renderMarkdown(text, content, file.path, null);
+			await MarkdownRenderer.renderMarkdown(
+				text,
+				content,
+				file.path,
+                // @ts-ignore
+				null
+			);
 			li.appendChild(title);
 			title.appendChild(link);
 			li.appendChild(content);
@@ -50,19 +59,21 @@ export default class TaggedDocumentsModal extends Modal {
 	}
 
 	async renderList() {
-        this.querying = true;
+		this.querying = true;
 		const listContents = await this.getListContents();
-        this.listContainer.empty()
+		this.listContainer.empty();
 		this.listContainer.appendChild(listContents);
-        this.querying = false;
+		this.querying = false;
 	}
 
-    async onPageChange(page: number) {
-        this.currentPage = page;
-        if (this.topPaginationControls.currentPage !== page) this.topPaginationControls.changeCurrentPage(page)
-        if (this.bottomPaginationControls.currentPage !== page) this.bottomPaginationControls.changeCurrentPage(page)
-        await this.renderList()
-    }
+	async onPageChange(page: number) {
+		this.currentPage = page;
+		if (this.topPaginationControls.currentPage !== page)
+			this.topPaginationControls.changeCurrentPage(page);
+		if (this.bottomPaginationControls.currentPage !== page)
+			this.bottomPaginationControls.changeCurrentPage(page);
+		await this.renderList();
+	}
 
 	async tagQuerySubmitLister() {
 		if (this.querying) return;
@@ -70,10 +81,16 @@ export default class TaggedDocumentsModal extends Modal {
 			"[data-tag-names]"
 		) as HTMLInputElement;
 		this.tag = inputEl.value;
-		this.filesWithTags = getTagFiles(this.app, this.tag)
-        this.topPaginationControls.renderPaginationControls(this.filesWithTags.length);
-        this.bottomPaginationControls.renderPaginationControls(this.filesWithTags.length);
-        this.currentPage = 0;
+		this.filesWithTags = getTagFiles(this.app, this.tag);
+		if (this.filesWithTags.length > MAX_DOCS_PER_PAGE) {
+			this.topPaginationControls.renderPaginationControls(
+				this.filesWithTags.length
+			);
+			this.bottomPaginationControls.renderPaginationControls(
+				this.filesWithTags.length
+			);
+		}
+		this.currentPage = 0;
 		await this.renderList();
 	}
 
@@ -126,26 +143,39 @@ export default class TaggedDocumentsModal extends Modal {
 		contentEl.empty();
 		const container = this.renderContainer();
 		const form = this.renderForm();
-		this.topPaginationControlsContainer = contentEl.createEl('div', { 
-			cls: 'pagination-controls-container'
-		})
-        this.bottomPaginationControlsContainer = contentEl.createEl('div', { 
-			cls: 'pagination-controls-container'
-		})
-		this.listContainer = contentEl.createEl('div');
-        this.listContainer.setAttribute("data-tageed-documents-viewer-list", "");
+		this.topPaginationControlsContainer = contentEl.createEl("div", {
+			cls: "pagination-controls-container",
+		});
+		this.bottomPaginationControlsContainer = contentEl.createEl("div", {
+			cls: "pagination-controls-container",
+		});
+		this.listContainer = contentEl.createEl("div");
+		this.listContainer.setAttribute(
+			"data-tageed-documents-viewer-list",
+			""
+		);
 		this.listContainer.addClass("tagged-documents-viewer-list-container");
-        await this.renderList();
-        this.topPaginationControls = new PaginationControls(this.topPaginationControlsContainer, this.onPageChange.bind(this));
-        this.bottomPaginationControls = new PaginationControls(this.bottomPaginationControlsContainer, this.onPageChange.bind(this));
-		if (this.tag) {
-			this.topPaginationControls.renderPaginationControls(this.filesWithTags.length)
-			this.bottomPaginationControls.renderPaginationControls(this.filesWithTags.length)
-        }
+		await this.renderList();
+		this.topPaginationControls = new PaginationControls(
+			this.topPaginationControlsContainer,
+			this.onPageChange.bind(this)
+		);
+		this.bottomPaginationControls = new PaginationControls(
+			this.bottomPaginationControlsContainer,
+			this.onPageChange.bind(this)
+		);
+		if (this.tag && this.filesWithTags.length > MAX_DOCS_PER_PAGE) {
+			this.topPaginationControls.renderPaginationControls(
+				this.filesWithTags.length
+			);
+			this.bottomPaginationControls.renderPaginationControls(
+				this.filesWithTags.length
+			);
+		}
 		container.appendChild(form);
-        container.appendChild(this.topPaginationControlsContainer);
+		container.appendChild(this.topPaginationControlsContainer);
 		container.appendChild(this.listContainer);
-        container.appendChild(this.bottomPaginationControlsContainer);
+		container.appendChild(this.bottomPaginationControlsContainer);
 		contentEl.appendChild(container);
 	}
 
@@ -159,8 +189,10 @@ export default class TaggedDocumentsModal extends Modal {
 		contentEl.empty();
 		this.button.removeEventListener("click", this.tagQuerySubmitLister);
 		this.input.removeEventListener("keydown", this.tagQueryKeyListener);
-		this.topPaginationControls.removeListeners()
-		this.bottomPaginationControls.removeListeners()
-        this.plugin.modalIsOpen = false;
+		if (this.topPaginationControls) {
+			this.topPaginationControls.removeListeners();
+			this.bottomPaginationControls.removeListeners();
+		}
+		this.plugin.modalIsOpen = false;
 	}
 }
