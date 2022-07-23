@@ -34,7 +34,6 @@ There are three togglable settings:
 
 ## Possible Future Development
 
-- pagination in the case of really long results
 - more complicated queries, e.g. allowing for searches like `(home AND cooking) !pasta` and maybe also allowing for date ranges, so users can search for all documents written prior to 2021 with the tag `taxes`.
 - sorting options
 - saving scrollable content as a new document

@@ -1,16 +1,5 @@
 //adapted from https://github.com/Aidurber/tag-page-preview/blob/master/src/utils/render.ts
-import { App, OpenViewState, TFile } from "obsidian";
-
-/**
- * Check if the current OS is macOS
- * @returns
- */
-function isMacOS(): boolean {
-  // @ts-ignore -- navigator.platform is deprecated in some browsers
-  const platform = navigator?.userAgentData?.platform || navigator?.platform
-  // on Macs, platform might be "MacIntel" or "macOS"
-  return platform.toLowerCase().startsWith("mac")
-}
+import { App, OpenViewState, TFile, Platform } from "obsidian";
 
 /**
  * Check if the event was CTRL for Windows or Command for macOS
@@ -18,7 +7,7 @@ function isMacOS(): boolean {
  * @returns
  */
 function isMetaKey(event: MouseEvent): boolean {
-  return isMacOS() ? event.metaKey : event.ctrlKey;
+  return Platform.isMacOS ? event.metaKey : event.ctrlKey;
 }
 /**
  * Open an Obsidian link

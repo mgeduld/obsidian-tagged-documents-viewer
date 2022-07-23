@@ -25,3 +25,17 @@
     margin: 0;
     background-color: #555;
 }
+
+.pagination-controls-container {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.pagination-controls-contianer button {
+    padding: .3rem;
+    background-color: transparent;
+}
+
+.current-page-button {
+    color: red;
+}
