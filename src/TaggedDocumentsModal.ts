@@ -40,7 +40,7 @@ export default class TaggedDocumentsModal extends Modal {
 			const link = createLink(this.app, file, () => this.close());
 			const content = this.containerEl.createEl("div");
 			// @ts-ignore
-			await MarkdownRenderer.renderMarkdown(text, content, file.path, this);
+			await MarkdownRenderer.renderMarkdown(text, content, file.path, null);
 			li.appendChild(title);
 			title.appendChild(link);
 			li.appendChild(content);
