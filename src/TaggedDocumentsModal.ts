@@ -47,8 +47,7 @@ export default class TaggedDocumentsModal extends Modal {
 				text,
 				content,
 				file.path,
-                // @ts-ignore
-				null
+				this.plugin
 			);
 			li.appendChild(title);
 			title.appendChild(link);
