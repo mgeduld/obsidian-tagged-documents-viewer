@@ -26,6 +26,7 @@ async function openLink(
 		dest,
 		currFile.path
 	);
+	if (!destFile) return;
 	const mode = (app.vault as any).getConfig("defaultViewMode");
 	const leaf = app.workspace.getLeaf(isMetaKey(event));
 	await leaf.openFile(

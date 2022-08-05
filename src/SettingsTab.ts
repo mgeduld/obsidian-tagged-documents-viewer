@@ -57,12 +57,10 @@ export default class SettingsTab extends PluginSettingTab {
 				component
 					.setValue(this.plugin.settings.openModalOnClick)
 					.onChange(async (value) => {
-						this.plugin.settings.openModalOnClick = value;
 						this.plugin.onSettingChange(
 							Settings.OpenModalOnClick,
 							value
 						);
-						await this.plugin.saveSettings();
 					});
 			});
 

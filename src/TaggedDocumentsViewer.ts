@@ -1,29 +1,46 @@
-import { Plugin } from "obsidian";
+import { Plugin, requireApiVersion } from "obsidian";
 import SettingsTab, {
 	DEFAULT_SETTINGS,
 	PluginSettings,
 	Settings,
 } from "./SettingsTab";
 import TaggedDocumentsModal from "./TaggedDocumentsModal";
+import { isTagNode } from "./utils/tags";
 
 export default class TaggedDocumentsViewer extends Plugin {
 	settings: PluginSettings;
-	openModalOnClick: boolean = true;
-	requireOptionKey: boolean = false;
 	ribbonIcon: HTMLElement;
 	modalIsOpen: boolean = false;
 
+	private shouldAbort(altKeyPressed: boolean) {
+		return (
+			!this.settings.openModalOnClick ||
+			(this.settings.requireOptionKey && !altKeyPressed) ||
+			this.modalIsOpen
+		);
+	}
+
 	async onload() {
 		await this.loadSettings();
-		this.openModalOnClick = this.settings.openModalOnClick;
-		this.requireOptionKey = this.settings.requireOptionKey;
 		this.addSettingTab(new SettingsTab(this.app, this));
-		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-			if (!this.openModalOnClick) return;
-			if (this.requireOptionKey && !evt.altKey) return;
-			if (this.modalIsOpen) return;
-			this.handleClick(evt.target as HTMLElement);
-		});
+
+		if (requireApiVersion("0.15.0")) {
+			this.registerDomEvent(
+				activeDocument,
+				"click",
+				(evt: MouseEvent) => {
+					if (this.shouldAbort(evt.altKey)) return;
+					this.handleClick(evt.target as HTMLElement);
+				}
+			);
+			this.app.workspace.on("window-open", (leaf) => {
+				this.registerDomEvent(leaf.doc, "click", (evt: MouseEvent) => {
+					if (this.shouldAbort(evt.altKey)) return;
+					this.handleClick(evt.target as HTMLElement);
+				});
+			});
+		}
+
 		if (this.settings.displayRibbonIcon) {
 			this.showRibbonIcon();
 		}
@@ -45,17 +62,19 @@ export default class TaggedDocumentsViewer extends Plugin {
 		this.ribbonIcon.remove();
 	}
 
-	onSettingChange(setting: Settings, value: boolean) {
+	async onSettingChange(setting: Settings, value: boolean) {
+		this.settings.openModalOnClick = value;
+		await this.saveSettings();
 		switch (setting) {
 			case Settings.DisplayRibbonIcon:
 				if (value) this.showRibbonIcon();
 				else this.hideRibbonIcon();
 				return;
 			case Settings.OpenModalOnClick:
-				this.openModalOnClick = value;
+				this.settings.openModalOnClick = value;
 				return;
 			case Settings.RequireOptionKey:
-				this.requireOptionKey = value;
+				this.settings.requireOptionKey = value;
 				return;
 		}
 	}
@@ -72,15 +91,8 @@ export default class TaggedDocumentsViewer extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	isTagNode(target: HTMLElement): boolean {
-		return (
-			target.classList.contains("tag") ||
-			target.classList.contains("cm-hashtag")
-		);
-	}
-
 	private async handleClick(target: HTMLElement) {
-		if (!this.isTagNode(target)) return;
+		if (!isTagNode(target)) return;
 		const tag = target.innerText;
 		this.modalIsOpen = true;
 		new TaggedDocumentsModal(this, this.app, tag).open();

@@ -10,6 +10,13 @@ export const getTaglists = (tagText: string): [string[], string[]] => {
 	return [include, exclude];
 };
 
+export const isTagNode = (target: HTMLElement): boolean => {
+	return (
+		target.classList.contains("tag") ||
+		target.classList.contains("cm-hashtag")
+	);
+};
+
 const hasTag = (tags: string[], value: string): boolean => {
 	if (!tags.length || !Array.isArray(tags)) return false;
 	return tags.some(
