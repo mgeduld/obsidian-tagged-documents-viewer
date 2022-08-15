@@ -5,10 +5,13 @@ const NEXT_BUTTON_LABEL = ">";
 const PREVIOUS_PAGE = -1;
 const NEXT_PAGE = Infinity; // we just need some value that's not a specific page number
 
+type ButtonList = { button: HTMLElement; listener: () => void }[];
+
 export default class PaginationControls {
 	public currentPage = 0;
 	private numPages = 0;
-	private pageButtons: { button: HTMLElement; listener: () => void }[] = [];
+	private pageButtons: ButtonList = [];
+	private navButtons: ButtonList = [];
 
 	constructor(
 		private container: HTMLElement,
@@ -16,9 +19,7 @@ export default class PaginationControls {
 	) {}
 
 	private findButton(page: number): HTMLElement | undefined {
-		return this.pageButtons.find(({ button }) =>
-			button.hasAttribute(`data-page-${page}`)
-		)?.button;
+		return this.pageButtons[page]?.button;
 	}
 
 	public changeCurrentPage(newPage: number) {
@@ -50,8 +51,9 @@ export default class PaginationControls {
 	}
 
 	public removeListeners() {
-		this.pageButtons.forEach(({ button, listener }) =>
-			button.removeEventListener("click", listener)
+		[...this.navButtons, ...this.pageButtons].forEach(
+			({ button, listener }) =>
+				button.removeEventListener("click", listener)
 		);
 	}
 
@@ -97,11 +99,12 @@ export default class PaginationControls {
 		const nextButtonListener = this.makeListener(NEXT_PAGE);
 		previousButton.addEventListener("click", previousButtonListener);
 		nextButton.addEventListener("click", nextButtonListener);
-		this.pageButtons.push({
+		this.navButtons = [];
+		this.navButtons.push({
 			button: previousButton,
 			listener: previousButtonListener,
 		});
-		this.pageButtons.push({
+		this.navButtons.push({
 			button: nextButton,
 			listener: nextButtonListener,
 		});
